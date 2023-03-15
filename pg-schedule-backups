@@ -40,6 +40,21 @@ main() { (
         my_sudo=sudo
     fi
 
+    if ! command -v serviceman > /dev/null; then
+        echo ""
+        echo "ERROR:"
+        echo "    'serviceman' is not installed"
+        echo "    (see https://webinstall.dev/serviceman for details)"
+        echo ""
+        echo "TO FIX:"
+        echo ""
+        echo "    curl -fsS https://webi.sh/serviceman | sh"
+        echo "    source ~/.config/envman/PATH.env"
+        echo ""
+        echo ""
+        exit 1
+    fi
+
     $my_sudo env PATH="${PATH}" \
         serviceman add \
         --system \
