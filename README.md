@@ -53,6 +53,7 @@ Your backups directory will look something like this:
 ```text
 /mnt/pg_backups/
 ├── heroku-postgresql-baz-000.pgpass
+├── foobar-app-latest.sql.xz
 ├── foobar-app-2023-03-14_16.56.06.sql.xz
 ├── foobar-app-2023-03-15_01.02.33.sql.xz
 └── foobar-app-2023-03-15_09.09.50.sql.xz
