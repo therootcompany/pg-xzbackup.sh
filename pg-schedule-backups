@@ -1,0 +1,53 @@
+#!/bin/sh
+set -e
+set -u
+
+my_hours="${1:-}"
+my_months="${2:-}"
+my_passfile="${3:-}"
+my_backup_dir="${4:-}"
+my_prefix="${5:-}"
+
+if test -z "${my_months}" ||
+    test -z "${my_hours}" ||
+    test -z "${my_passfile}" ||
+    test -z "${my_backup_dir}"; then
+
+    echo ""
+    echo "USAGE"
+    echo "    pg-schedule-backups <hours-between> <months-to-keep> <pg-passfile> <backup-dir> [file-prefix]"
+    echo ""
+    echo "EXAMPLE"
+    # shellcheck disable=SC1003
+    echo '    pg-schedule-backups 8 60 \'
+    # shellcheck disable=SC1003
+    echo '        /mnt/pg_backups/heroku-postgresql-foo-100.pgpass \'
+    # shellcheck disable=SC1003
+    echo '        /mnt/pg_backups/ \'
+    echo "        foobar-app"
+    echo ""
+
+    exit 1
+fi
+
+if test -z "${my_prefix}"; then
+    my_prefix='postgres'
+fi
+
+main() { (
+    my_sudo=
+    if command -v sudo > /dev/null; then
+        my_sudo=sudo
+    fi
+
+    $my_sudo env PATH="${PATH}" \
+        serviceman add \
+        --system \
+        --username "$(whoami)" \
+        --path="${PATH}" \
+        --name pg-loop-backup \
+        pg-loop-backup "${my_hours}" "${my_months}" "${my_passfile}" "${my_backup_dir}" "${my_prefix}"
+
+); }
+
+main

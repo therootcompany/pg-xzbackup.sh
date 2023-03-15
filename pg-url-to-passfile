@@ -1,0 +1,54 @@
+#!/bin/sh
+set -e
+set -u
+
+my_pg_urlfile="${1:-}"
+my_pg_passfile="${2:-}"
+
+if test -z "${my_pg_urlfile}" ||
+    test -z "${my_pg_passfile}"; then
+
+    echo ""
+    echo "pg-url-to-passfile"
+    echo "Converts 'postgres://u:p@h:5432/d' to 'h:5432:d:u:p'"
+    echo ""
+    echo "USAGE"
+    echo "    pg-url-to-passfile <pg-urlfile> <pg-passfile>"
+    echo ""
+    echo "EXAMPLE"
+    echo "    pg-url-to-passfile ./db-url.txt ./heroku-foobar-app.pgpass"
+    echo ""
+
+    exit 1
+fi
+
+if test -e "${my_pg_passfile}"; then
+
+    echo ""
+    echo "Error:"
+    echo "    refusing to overwrite '${my_pg_passfile}'"
+    echo ""
+    echo "Fix:"
+    echo "    rm -i '${my_pg_passfile}'"
+    echo ""
+
+    exit 1
+fi
+
+main() { (
+    DATABASE_URL="$(
+        cat "${my_pg_urlfile}"
+    )"
+
+    my_auth="$(
+        echo "${DATABASE_URL}" | sed 's,@,:,g' | sed 's,/,:,g' | cut -d':' -f4-5
+    )"
+
+    my_host="$(
+        echo "${DATABASE_URL}" | sed 's,@,:,g' | sed 's,/,:,g' | cut -d':' -f6-8
+    )"
+
+    echo "${my_host}:${my_auth}" > "${my_pg_passfile}"
+); }
+
+main

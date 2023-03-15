@@ -1,0 +1,51 @@
+#!/bin/sh
+set -e
+set -u
+
+my_passfile="${1:-}"
+my_restorefile="${2:-}"
+
+if test -z "${my_passfile}" ||
+    test -z "${my_restorefile}"; then
+
+    echo ""
+    echo "USAGE"
+    echo "    pg-xzrestore <pg-passfile> <xz-backup-sql-file>"
+    echo ""
+    echo "EXAMPLE"
+    # shellcheck disable=SC1003
+    echo '    pg-xzrestore \'
+    # shellcheck disable=SC1003
+    echo '        /mnt/pg_backups/heroku-postgresql-foo-100.pgpass \'
+    echo "        /mnt/pg_backups/foobar-app-2023-03-17_23.59.59.sql.xz"
+    echo ""
+
+    exit 1
+fi
+
+main() { (
+    export PGPASSFILE="${my_passfile}"
+    echo "Reading credentials from '${PGPASSFILE}'"
+
+    # for our purposes we assume the first record of the pgpass file is the only one
+    my_host="$(
+        head -n 1 "${PGPASSFILE}" | cut -d':' -f1
+    )"
+    my_dbname="$(
+        head -n 1 "${PGPASSFILE}" | cut -d':' -f3
+    )"
+    my_user="$(
+        head -n 1 "${PGPASSFILE}" | cut -d':' -f4
+    )"
+
+    echo "xzcat \"${my_restorefile}\" |"
+    echo "    psql -h \"${my_host}\" -U \"${my_user}\" \"${my_dbname}\""
+
+    xzcat "${my_restorefile}" |
+        psql -h "${my_host}" -U "${my_user}" "${my_dbname}"
+
+    echo "Done."
+    echo ""
+); }
+
+main

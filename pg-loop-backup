@@ -1,0 +1,67 @@
+#!/bin/sh
+set -e
+set -u
+
+my_hours="${1:-}"
+my_months="${2:-}"
+my_passfile="${3:-}"
+my_backup_dir="${4:-}"
+my_prefix="${5:-}"
+
+if test -z "${my_months}" ||
+    test -z "${my_hours}" ||
+    test -z "${my_passfile}" ||
+    test -z "${my_backup_dir}"; then
+
+    echo ""
+    echo "USAGE"
+    echo "    pg-loop-backup <hours-between> <months-to-keep> <pg-passfile> <backup-dir> [file-prefix]"
+    echo ""
+    echo "EXAMPLE"
+    # shellcheck disable=SC1003
+    echo '    pg-loop-backup 8 60 \'
+    # shellcheck disable=SC1003
+    echo '        /mnt/pg_backups/heroku-postgresql-foo-100.pgpass \'
+    # shellcheck disable=SC1003
+    echo '        /mnt/pg_backups/ \'
+    echo "        foobar-app"
+    echo ""
+
+    exit 1
+fi
+
+if test -z "${my_prefix}"; then
+    my_prefix='postgres'
+fi
+
+main() { (
+    my_days="$((my_months * 30))"
+    # add a little bit of skew
+    my_wait="$((my_hours * 67 * 59))"
+    my_zip="xz"
+
+    while true; do
+        pg-xzbackup "${my_passfile}" "${my_backup_dir}" "${my_prefix}"
+
+        # To test making an old file:
+        #touch -t '201012312359' /mnt/pg_backups/pg-luckygrids-2023-03-15_06.40.42.sql.xz
+
+        echo ""
+        echo "Deleting backups (*.sql.${my_zip}) ${my_months}+ months old..."
+        find "${my_backup_dir}" \
+            -type f \
+            -name "*.sql.${my_zip}" \
+            -mtime "+${my_days}" \
+            -print \
+            -delete
+
+        echo ""
+        echo "Waiting a little over ${my_hours} hours..."
+
+        sleep "${my_wait}"
+        sleep 13
+        echo ""
+    done
+); }
+
+main

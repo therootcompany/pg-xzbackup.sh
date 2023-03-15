@@ -1,0 +1,95 @@
+#!/bin/sh
+set -e
+set -u
+
+my_passfile="${1:-}"
+my_backup_dir="${2:-}"
+my_prefix="${3:-}"
+
+if test -z "${my_passfile}" ||
+    test -z "${my_backup_dir}"; then
+
+    echo ""
+    echo "USAGE"
+    echo "    pg-xzbackup <pg-passfile> <backup-dir> [file-prefix]"
+    echo ""
+    echo "EXAMPLE"
+    # shellcheck disable=SC1003
+    echo '    pg-xzbackup \'
+    # shellcheck disable=SC1003
+    echo '        /mnt/pg_backups/heroku-postgresql-foo-100.pgpass \'
+    # shellcheck disable=SC1003
+    echo '        /mnt/pg_backups/ \'
+    echo "        postgres-heroku-foobar-app"
+    echo ""
+
+    exit 1
+fi
+
+if test -z "${my_prefix}"; then
+    my_prefix='postgres'
+fi
+
+main() { (
+    my_date="$(
+        date -u '+%F_%H.%M.%S'
+    )"
+
+    my_zip="xz"
+    my_filename="${my_prefix}-${my_date}.sql.${my_zip}"
+    my_filepath="$(
+        # nix double / in path
+        echo "${my_backup_dir}/${my_filename}" | sed 's,//,/,g'
+    )"
+
+    export PGPASSFILE="${my_passfile}"
+    echo "Reading credentials from '${PGPASSFILE}'"
+
+    # for our purposes we assume the first record of the pgpass file is the only one
+    my_host="$(
+        head -n 1 "${PGPASSFILE}" | cut -d':' -f1
+    )"
+    my_dbname="$(
+        head -n 1 "${PGPASSFILE}" | cut -d':' -f3
+    )"
+    my_user="$(
+        head -n 1 "${PGPASSFILE}" | cut -d':' -f4
+    )"
+
+    echo "Writing to '${my_filepath}'."
+
+    #psql -h "${my_host}" -U "${my_user}" "${my_dbname}"
+    #pg_dump -Fp --no-acl --no-owner "$(cat "${my_passfile}")" > "${my_filepath}"
+
+    # Includes commands to delete (clean) and restore the database tables,
+    # but uses 'grep' to exclude heroku admin-only extensions
+    pg_dump -Fp --no-acl --no-owner --clean --if-exists \
+        -h "${my_host}" \
+        -U "${my_user}" \
+        -d "${my_dbname}" |
+        grep -v -E '^(CREATE\ EXTENSION|COMMENT\ ON\ EXTENSION)' |
+        "${my_zip}" > "${my_filepath}"
+    chmod 0440 "${my_filepath}"
+
+    my_dir="$(
+        dirname "${my_filepath}"
+    )"
+    my_latest="${my_dir}/${my_prefix}-latest.sql.${my_zip}"
+
+    echo "Linking to '${my_latest}'."
+    rm -f "${my_latest}" || true
+    ln -sf "${my_filename}" "${my_latest}" || true
+
+    echo "Done."
+    echo ""
+    echo "TO VIEW"
+    echo "    xzcat ${my_filepath} |"
+    echo "        bat -l sql"
+    echo ""
+    echo "TO RESTORE"
+    echo "    pg-xzrestore '${my_passfile}' \\"
+    echo "        '${my_filepath}'"
+    echo ""
+); }
+
+main
