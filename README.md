@@ -6,24 +6,21 @@ Scripts for automated backup and manual restore of PostgreSQL databases. \
 Especially useful for _not_ paying $200/month for small datasets. \
 (e.g. Heroku where only "Premium" databases have 30+ day backups)
 
-1. Authorize
+0. VPS Setup \
+   See [./PROVISION.md](./PROVISION.md).
+1. Authorize with a passfile \
 
-    ```sh
-    # save your credentials to a single-entry pgpass file
-    echo "hostname:5432:dbname:username:secret" \
-        > ./heroku-foo-100.pgpass
+    `./foobar-app.pgpass`:
 
-    # or convert an existing PG_URL into pgpass format
-    pg-url-to-passfile \
-        ./pg-url.txt \
-        ./heroku-foobar-app.pgpass
+    ```text
+    pg-hostname:5432:pg-dbname:pg-username:pg-secret
     ```
 
 2. Backup
     ```sh
     # pg-xzbackup <pg-passfile> <backup-dir> [file-prefix]
     pg-xzbackup \
-        ./heroku-foo-100.pgpass \
+        ./foobar-app.pgpass \
         /mnt/pg-backups/ \
         foobar-app
     ```
@@ -31,39 +28,48 @@ Especially useful for _not_ paying $200/month for small datasets. \
     ```sh
     # pg-xzbackup <pg-passfile> <xz-backup-file>
     pg-xzrestore \
-        ./heroku-foo-100.pgpass \
+        ./foobar-app.pgpass \
         /mnt/pg-backups/postgres-latest.sql.xz
     ```
-4. Schedule
-    - Install Serviceman
-        ```sh
-        curl -fsS https://webi.sh/serviceman | sh
-        source ~/.config/envman/PATH.env
-        ```
-    - Schedule to run every _H_ hours and delete after _M_ months
-        ```sh
-        # pg-schedule-backups <h> <m> <pgpass> <bak-dir> [prefix]
-        pg-schedule-backups \
-            8 \
-            60 \
-            /mnt/pg-backups/heroku-foo-100.pgpass \
-            /mnt/pg-backups/ \
-            foobar-app
-        ```
-        (`pg-loop-backup` must be in `PATH`, [`pathman`](https://webinstall.dev/pathman) can help)
-    - Check the logs to make sure the service is running successfully
-        ```sh
-        sudo journalctl -xef --unit pg-loop-backup.service
-        ```
+4. Schedule \
+   (run every _H_ hours and delete after _M_ months)
+    ```sh
+    # pg-schedule-backups <h> <m> <pgpass> <bak-dir> [prefix]
+    pg-schedule-backups \
+        8 \
+        60 \
+        /mnt/pg-backups/foobar-app.pgpass \
+        /mnt/pg-backups/ \
+        foobar-app
+    ```
+    (`pg-loop-backup` must be in `PATH`, [`pathman`](https://webinstall.dev/pathman) can help)
+5. Check Logs
+    ```sh
+    sudo journalctl -xef --unit pg-loop-backup.service
+    ```
 
 Your backups directory will look something like this:
 
 ```text
 /mnt/pg_backups/
-├── heroku-postgresql-foo-100.pgpass
+├── heroku-postgresql-baz-000.pgpass
 ├── foobar-app-2023-03-14_16.56.06.sql.xz
 ├── foobar-app-2023-03-15_01.02.33.sql.xz
 └── foobar-app-2023-03-15_09.09.50.sql.xz
+```
+
+If you have a `DATABASE_URL`, you can convert that to passfile format by hand or with `pg-url-to-passfile`:
+
+`./pg-url.env`:
+
+```sh
+DATABASE_URL=postgres://pg-username:pg-secret@pg-hostname:5432/pg-dbname
+```
+
+```sh
+pg-url-to-passfile \
+    ./pg-url.env \
+    ./foobar-app.pgpass
 ```
 
 # Notes
@@ -79,7 +85,7 @@ Your backups directory will look something like this:
 -   To get your PostgreSQL Database URL:
     ```sh
     heroku config:get -a foobar-app DATABASE_URL > ./pg-url.txt
-    pg-url-to-passfile ./pg-url.txt ./heroku-foobar-app.pgpass
+    pg-url-to-passfile ./pg-url.txt ./heroku-baz-000.pgpass
     ```
 
 ## Secure, Inexpensive, Long-Term Backups
